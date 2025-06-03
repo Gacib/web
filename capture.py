@@ -12,7 +12,7 @@ st.set_page_config(page_title="Carta con Descuentos", layout="centered")
 st.title("🍽️ Carta Exclusiva con Descuentos Cercanos")
 st.write("Para mostrarte los mejores descuentos cerca de ti, necesitamos acceder a tu ubicación.")
 
-# Script para obtener geolocalización y actualizar URL con query param
+# Script para obtener geolocalización y actualizar URL con query param sin recargar
 geoloc_script = """
 <script>
 navigator.geolocation.getCurrentPosition(
@@ -39,8 +39,8 @@ navigator.geolocation.getCurrentPosition(
 
 components.html(geoloc_script, height=0)
 
-# Leer parámetros de consulta usando la función oficial
-query_params = st.get_query_params()
+# Leer parámetros de consulta con la función experimental correcta
+query_params = st.experimental_get_query_params()
 
 lat, lon = None, None
 if "geodata" in query_params:
