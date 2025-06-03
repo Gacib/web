@@ -40,7 +40,7 @@ navigator.geolocation.getCurrentPosition(
 components.html(geoloc_script, height=0)
 
 # Leer query param 'geodata'
-geo_data_raw = st.query_params().get("geodata")
+geo_data_raw = st.query_params("geodata")
 
 lat, lon = None, None
 if geo_data_raw:
