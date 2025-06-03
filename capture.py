@@ -65,7 +65,7 @@ components.html(
 )
 
 # Leer parámetros de consulta para obtener ubicación
-query_params = st.experimental_get_query_params()
+query_params = st.query_params
 lat, lon = None, None
 if "geodata" in query_params:
     try:
