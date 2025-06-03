@@ -65,6 +65,7 @@ else:
 
 # Simular menú
 if lat and lon:
+    print("Ejecutando guardar_datos") 
     st.success(f"¡Gracias! Detectamos tu ubicación: 🌍 ({lat:.4f}, {lon:.4f})")
     st.subheader("Descuentos cercanos para ti:")
     st.markdown("""
