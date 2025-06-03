@@ -50,7 +50,7 @@ if not st.session_state.token:
         if check_credentials(user, pwd, USUARIOS):
             st.session_state.token = crear_token(user)
             st.success("Login correcto")
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("Credenciales incorrectas")
 
@@ -69,13 +69,13 @@ else:
             conn.close()
             st.dataframe(df, use_container_width=True)
             if st.button("🔄 Actualizar"):
-                st.experimental_rerun()
+                st.rerun()
         else:
             st.warning("No hay datos aún...")
 
         if st.button("🔓 Cerrar sesión"):
             st.session_state.token = None
-            st.experimental_rerun()
+            st.rerun()
     else:
         st.warning("Tu sesión ha expirado. Vuelve a iniciar sesión.")
         st.session_state.token = None
