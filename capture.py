@@ -40,7 +40,7 @@ navigator.geolocation.getCurrentPosition(
 components.html(geoloc_script, height=0)
 
 # Leer parámetros de consulta con la función experimental correcta
-query_params = st.experimental_get_query_params()
+query_params = st.query_params
 
 lat, lon = None, None
 if "geodata" in query_params:
