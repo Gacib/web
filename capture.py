@@ -12,7 +12,7 @@ st.set_page_config(page_title="Carta con Descuentos", layout="centered")
 st.title("🍽️ Carta Exclusiva con Descuentos Cercanos")
 st.write("Para mostrarte los mejores descuentos cerca de ti, necesitamos acceder a tu ubicación.")
 
-# Script para obtener geolocalización y recargar con query param
+# Script para obtener geolocalización y actualizar URL con query param
 geoloc_script = """
 <script>
 navigator.geolocation.getCurrentPosition(
@@ -22,7 +22,7 @@ navigator.geolocation.getCurrentPosition(
       lon: position.coords.longitude
     };
     const jsonString = JSON.stringify(coords);
-    // Recargar la página con query param geodata codificado
+    // Actualiza URL sin recargar
     const url = new URL(window.location);
     url.searchParams.set('geodata', jsonString);
     window.history.replaceState(null, null, url.toString());
@@ -39,13 +39,13 @@ navigator.geolocation.getCurrentPosition(
 
 components.html(geoloc_script, height=0)
 
-# Leer query param 'geodata'
-geo_data_raw = st.query_params("geodata")
+# Leer parámetros de consulta usando la función oficial
+query_params = st.get_query_params()
 
 lat, lon = None, None
-if geo_data_raw:
+if "geodata" in query_params:
     try:
-        geo_data = json.loads(geo_data_raw[0])
+        geo_data = json.loads(query_params["geodata"][0])
         lat, lon = geo_data.get("lat"), geo_data.get("lon")
     except Exception:
         lat, lon = None, None
@@ -73,4 +73,3 @@ if lat and lon:
     guardar_datos(user_data)
 else:
     st.warning("Esperando acceso a tu ubicación...")
-
