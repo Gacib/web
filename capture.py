@@ -37,8 +37,8 @@ components.html(geoloc_script, height=0)
 location = st.empty()
 
 # Recolecta mensaje JS
-message = st.experimental_get_query_params()
-js_response = st.experimental_get_query_params()
+message = st.query_params
+js_response = st.query_params
 
 # Escucha mensajes desde JS
 components.html(
