@@ -22,6 +22,7 @@ def guardar_datos(data):
         "os": data.get("os"),
         "hostname": data.get("hostname"),
     }
+    print("Datos a guardar:", row)
     try:
         response = supabase.table("visitas").insert(row).execute()
         print("✅ Datos insertados:", response)
