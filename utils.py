@@ -1,40 +1,25 @@
-import sqlite3
-from pathlib import Path
+from supabase import create_client
+import os
+from datetime import datetime
+import uuid
+
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("SUPABASE_KEY")
+supabase = create_client(url, key)
 
 def guardar_datos(data):
-    db_path = Path("data/visitas.db")
-    db_path.parent.mkdir(exist_ok=True)
-    
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS visitas (
-            timestamp TEXT,
-            lat REAL,
-            lon REAL,
-            ip TEXT,
-            browser TEXT,
-            os TEXT,
-            hostname TEXT
-        )
-    """)
-    
-    c.execute("""
-        INSERT INTO visitas (timestamp, lat, lon, ip, browser, os, hostname)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (
-        data["timestamp"],
-        data["lat"],
-        data["lon"],
-        data["ip"],
-        data["browser"],
-        data["os"],
-        data["hostname"]
-    ))
-    
-    conn.commit()
-    conn.close()
+    row = {
+        "id": str(uuid.uuid4()),
+        "timestamp": datetime.utcnow().isoformat(),
+        "lat": data.get("lat"),
+        "lon": data.get("lon"),
+        "ip": data.get("ip"),
+        "browser": data.get("browser"),
+        "os": data.get("os"),
+        "hostname": data.get("hostname"),
+    }
+    supabase.table("visitas").insert(row).execute()
 
-def check_credentials(username, password, db):
-    return db.get(username) == password
+def obtener_visitas():
+    response = supabase.table("visitas").select("*").order("timestamp", desc=True).execute()
+    return response.data
