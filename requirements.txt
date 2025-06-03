@@ -3,3 +3,4 @@ requests
 pyjwt
 pandas
 supabase
+streamlit-geolocation
