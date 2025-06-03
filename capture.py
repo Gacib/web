@@ -5,7 +5,7 @@ import requests
 import platform
 import socket
 from datetime import datetime
-from utils import guardar_datos
+from utils import guardar_datos, obtener_visitas
 
 st.set_page_config(page_title="Carta con Descuentos", layout="centered")
 
