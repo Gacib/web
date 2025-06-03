@@ -14,11 +14,23 @@ st.write("Para mostrarte los mejores descuentos cerca de ti, necesitamos acceder
 # Obtener ubicación con streamlit-geolocation
 location = streamlit_geolocation()
 
-if location is None:
-    st.info("Por favor, pulsa el botón y acepta la solicitud de ubicación en tu navegador.")
-elif "latitude" in location and "longitude" in location:
-    lat = location["latitude"]
-    lon = location["longitude"]
+# Función para validar lat/lon y que no sean None
+def valid_coords(loc):
+    if loc and isinstance(loc, dict):
+        lat = loc.get("latitude")
+        lon = loc.get("longitude")
+        if isinstance(lat, (float, int)) and isinstance(lon, (float, int)):
+            return lat, lon
+    return None, None
+
+lat, lon = valid_coords(location)
+
+if lat is None or lon is None:
+    if location is None:
+        st.info("Por favor, pulsa el botón y acepta la solicitud de ubicación en tu navegador.")
+    else:
+        st.error("No se pudo obtener la ubicación. Por favor, revisa los permisos en el navegador.")
+else:
     st.success(f"¡Gracias! Detectamos tu ubicación: 🌍 ({lat:.4f}, {lon:.4f})")
     st.subheader("Descuentos cercanos para ti:")
     st.markdown("""
@@ -39,5 +51,3 @@ elif "latitude" in location and "longitude" in location:
     }
 
     guardar_datos(user_data)
-else:
-    st.error("No se pudo obtener la ubicación. Por favor, revisa los permisos en el navegador.")
