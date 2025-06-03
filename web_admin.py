@@ -6,7 +6,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
 from utils import check_credentials
-from utils import obtener_visitas
+from utils import guardar_datos, obtener_visitas
 
 # Config app
 st.set_page_config(page_title="Panel Admin", layout="wide")
