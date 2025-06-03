@@ -27,3 +27,6 @@ def guardar_datos(data):
 def obtener_visitas():
     response = supabase.table("visitas").select("*").order("timestamp", desc=True).execute()
     return response.data
+
+def check_credentials(username, password, db):
+    return db.get(username) == password
