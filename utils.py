@@ -6,6 +6,10 @@ import uuid
 url = os.getenv("SUPABASE_URL")
 key = os.getenv("SUPABASE_KEY")
 
+print("URL:", url)
+print("KEY:", key[:8] + "..." + key[-4:])
+
+
 if not url or not key:
     raise ValueError("❌ Supabase URL o KEY no está definida en los secrets")
     
