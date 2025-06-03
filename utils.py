@@ -35,3 +35,6 @@ def guardar_datos(data):
     
     conn.commit()
     conn.close()
+
+def check_credentials(username, password, db):
+    return db.get(username) == password
