@@ -12,72 +12,58 @@ st.set_page_config(page_title="Carta con Descuentos", layout="centered")
 st.title("🍽️ Carta Exclusiva con Descuentos Cercanos")
 st.write("Para mostrarte los mejores descuentos cerca de ti, necesitamos acceder a tu ubicación.")
 
-# JS para obtener geolocalización desde navegador
-geoloc_script = """
-<script>
-navigator.geolocation.getCurrentPosition(
-  (position) => {
-    const coords = {
-      lat: position.coords.latitude,
-      lon: position.coords.longitude
-    };
-    const jsonString = JSON.stringify(coords);
-    window.parent.postMessage(jsonString, "*");
-  },
-  (error) => {
-    const errorMsg = JSON.stringify({error: "No se pudo obtener ubicación"});
-    window.parent.postMessage(errorMsg, "*");
-  }
-);
-</script>
-"""
+# Mostrar solo si aún no tenemos datos de ubicación
+if "lat" not in st.session_state or "lon" not in st.session_state:
+    # JS para obtener geolocalización desde navegador y enviar mensaje al iframe
+    components.html("""
+        <script>
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const coords = {
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude
+                };
+                window.parent.postMessage(coords, "*");
+            },
+            (error) => {
+                window.parent.postMessage({error: "No se pudo obtener ubicación"}, "*");
+            }
+        );
+        </script>
+    """, height=0)
 
-components.html(geoloc_script, height=0)
+    # JS listener que recibe datos y actualiza usando Streamlit's postMessage API
+    components.html("""
+        <script>
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+            if (data.lat && data.lon) {
+                const streamlitMessage = {
+                    isStreamlitMessage: true,
+                    type: "streamlit:setComponentValue",
+                    value: data
+                };
+                window.parent.postMessage(streamlitMessage, "*");
+            }
+        });
+        </script>
+    """, height=0)
 
-location = st.empty()
-
-# Recolecta mensaje JS
-message = st.query_params
-js_response = st.query_params
-
-# Escucha mensajes desde JS
-components.html(
-    """
-    <script>
-    window.addEventListener("message", (event) => {
-        const data = JSON.stringify(event.data);
-        const query = "?geodata=" + encodeURIComponent(data);
-        window.location.href = window.location.pathname + query;
-    });
-    </script>
-    """,
-    height=0,
-)
-
-if "geodata" in js_response:
-    try:
-        geo_data = json.loads(js_response["geodata"][0])
-        lat, lon = geo_data.get("lat"), geo_data.get("lon")
-    except:
-        lat, lon = None, None
+    st.warning("Esperando acceso a tu ubicación...")
 else:
-    lat, lon = None, None
-
-# Simular menú
-if lat and lon:
-    print("Ejecutando guardar_datos") 
+    lat = st.session_state["lat"]
+    lon = st.session_state["lon"]
     st.success(f"¡Gracias! Detectamos tu ubicación: 🌍 ({lat:.4f}, {lon:.4f})")
+
+    # Mostrar descuentos
     st.subheader("Descuentos cercanos para ti:")
     st.markdown("""
     - 🍕 Pizza Margarita -20%
     - 🍣 Sushi Deluxe -15%
     - 🥗 Ensalada Mediterránea -10%
     """)
-else:
-    st.warning("Esperando acceso a tu ubicación...")
 
-# Registrar datos
-if lat and lon:
+    # Registrar datos de usuario
     user_data = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "lat": lat,
@@ -89,3 +75,11 @@ if lat and lon:
     }
 
     guardar_datos(user_data)
+
+# Captura del valor desde JS (solo una vez)
+value = components.declare_component("geoloc_capture", default=None)
+
+if value and "lat" not in st.session_state and "lon" not in st.session_state:
+    st.session_state["lat"] = value["lat"]
+    st.session_state["lon"] = value["lon"]
+    st.experimental_rerun()
