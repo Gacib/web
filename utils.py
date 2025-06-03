@@ -5,6 +5,10 @@ import uuid
 
 url = os.getenv("SUPABASE_URL")
 key = os.getenv("SUPABASE_KEY")
+
+if not url or not key:
+    raise ValueError("❌ Supabase URL o KEY no está definida en los secrets")
+    
 supabase = create_client(url, key)
 
 def guardar_datos(data):
