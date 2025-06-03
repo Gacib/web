@@ -6,6 +6,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
 from utils import check_credentials
+from utils import obtener_visitas
 
 # Config app
 st.set_page_config(page_title="Panel Admin", layout="wide")
@@ -63,13 +64,12 @@ else:
 
         # Mostrar tabla de capturas
         db_path = Path("data/visitas.db")
-        if db_path.exists():
-            conn = sqlite3.connect(db_path)
-            df = pd.read_sql_query("SELECT * FROM visitas ORDER BY timestamp DESC", conn)
-            conn.close()
-            st.dataframe(df, use_container_width=True)
-            if st.button("🔄 Actualizar"):
-                st.rerun()
+
+        visitas = obtener_visitas()
+        if visitas:
+            df = pd.DataFrame(visitas)
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
+            st.dataframe(df.sort_values(by="timestamp", ascending=False), use_container_width=True)
         else:
             st.warning("No hay datos aún...")
 
