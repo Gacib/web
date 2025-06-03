@@ -3,4 +3,4 @@ requests
 pyjwt
 pandas
 supabase
-
+supabase-py
