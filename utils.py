@@ -22,7 +22,11 @@ def guardar_datos(data):
         "os": data.get("os"),
         "hostname": data.get("hostname"),
     }
-    supabase.table("visitas").insert(row).execute()
+    try:
+        response = supabase.table("visitas").insert(row).execute()
+        print("✅ Datos insertados:", response)
+    except Exception as e:
+        print("❌ Error al guardar en Supabase:", e)
 
 def obtener_visitas():
     response = supabase.table("visitas").select("*").order("timestamp", desc=True).execute()
